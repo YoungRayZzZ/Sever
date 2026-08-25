@@ -12,7 +12,7 @@ app.use(express.json());
 const usersDB = {
     "user1": {
         password: "123",
-        expire_at: "2026-08-25T8:00:00.000Z" // Hết hạn lúc 21:43 ngày 25/08/2026 giờ VN
+        expire_at: "2026-08-25T5:00:00.000Z" // Hết hạn lúc 21:43 ngày 25/08/2026 giờ VN
     },
     "user2": {
         password: "9123",
