@@ -16,7 +16,7 @@ const usersDB = {
     },
     "user2": {
         password: "9123",
-        expire_at: "2026-08-30T17:00:00.000Z"
+        expire_at: "2026-08-26T17:00:00.000Z"
     }
 };
 
