@@ -1,88 +1,73 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-const logFilePath = path.join(__dirname, 'server.log');
+// File lưu nhật ký hoạt động
+const LOG_FILE = path.join(__dirname, 'server.log');
 
+// Hàm ghi log vào file và console
 function writeLog(message) {
-    const vnTime = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-    const logMessage = `[${vnTime}] ${message}\n`;
-
-    console.log(logMessage.trim());
-
-    fs.appendFile(logFilePath, logMessage, (err) => {
-        if (err) console.error("Lỗi khi ghi file log:", err);
-    });
+    const timestamp = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+    const logLine = `[${timestamp}] ${message}\n`;
+    console.log(logLine.trim());
+    fs.appendFileSync(LOG_FILE, logLine, 'utf8');
 }
 
+// Cơ sở dữ liệu người dùng (Thay đổi thông tin tài khoản tại đây)
 const usersDB = {
-    "user1": {
-        password: "1001",
-        expire_at: "2026-12-31T23:59:59+07:00",
+    "admin": {
+        password: "2008",
+        expire_at: "2026-8-26T21:46:00+07:00", // Định dạng ISO-8601 chuẩn
         allowed_ip: ""
     },
-    "user2": {
-        password: "0002",
+    "user1": {
+        password: "123",
         expire_at: "2026-08-26T21:39:00+07:00",
         allowed_ip: ""
     }
 };
 
-app.get('/', (req, res) => {
-    res.send("Server Auth Minecraft Client đang hoạt động!");
-});
-
-app.get('/logs', (req, res) => {
-    if (fs.existsSync(logFilePath)) {
-        res.sendFile(logFilePath);
-    } else {
-        res.status(404).send("Chưa có dữ liệu log!");
-    }
-});
-
-// API ĐĂNG NHẬP
+// API 1: Đăng nhập
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
     const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 
     const user = usersDB[username];
 
-    if (!user) {
-        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Không tồn tại`);
-        return res.status(401).json({ valid: false, message: "Tài khoản không tồn tại!" });
-    }
-
-    if (user.password !== password) {
-        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Sai mật khẩu`);
-        return res.status(401).json({ valid: false, message: "Mật khẩu không chính xác!" });
+    if (!user || user.password !== password) {
+        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Sai tài khoản hoặc mật khẩu`);
+        return res.status(401).json({ valid: false, message: "Sai tài khoản hoặc mật khẩu!" });
     }
 
     const currentTime = Date.now();
     const expireTime = new Date(user.expire_at).getTime();
 
-    // Chặn ngay lập tức tại bước đăng nhập nếu hết hạn
-    if (currentTime >= expireTime) {
-        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Đã hết hạn`);
-        return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
+    // Kiểm tra tính hợp lệ của thời gian hết hạn
+    if (isNaN(expireTime) || currentTime >= expireTime) {
+        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Tài khoản đã hết hạn (${user.expire_at})`);
+        return res.status(403).json({ valid: false, message: "Tài khoản của bạn đã hết hạn sử dụng!" });
     }
 
+    // Kiểm tra khóa IP (Nếu tài khoản chưa gán IP thì tự động gán IP lần đầu)
     if (!user.allowed_ip) {
         user.allowed_ip = clientIp;
-        writeLog(`[GHI NHẬN IP MỚI] Username: '${username}' -> Đã gán IP: ${clientIp}`);
+        writeLog(`[GÁN IP MỚI] Username: '${username}' đã đăng ký IP: ${clientIp}`);
     } else if (user.allowed_ip !== clientIp) {
-        writeLog(`[CẢNH BÁO IP] Username: '${username}' | IP Đăng nhập: ${clientIp} | IP Gốc: ${user.allowed_ip}`);
-        return res.status(403).json({ valid: false, message: "Tài khoản đang được sử dụng ở thiết bị/IP khác!" });
+        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP gửi: ${clientIp} | IP chuẩn: ${user.allowed_ip}`);
+        return res.status(403).json({ valid: false, message: "Tài khoản đang được dùng trên thiết bị/IP khác!" });
     }
 
     writeLog(`[LOGIN THÀNH CÔNG] Username: '${username}' | IP: ${clientIp}`);
     return res.status(200).json({ valid: true, message: "Đăng nhập thành công!" });
 });
 
-// API KIỂM TRA ĐỊNH KỲ (HEARTBEAT)
+// API 2: Kiểm tra trạng thái liên tục (Heartbeat cho AuthChecker.java)
 app.post('/api/auth/check-status', (req, res) => {
     const { username } = req.body;
     const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
@@ -96,27 +81,44 @@ app.post('/api/auth/check-status', (req, res) => {
     const currentTime = Date.now();
     const expireTime = new Date(user.expire_at).getTime();
 
-    if (currentTime >= expireTime) {
-        writeLog(`[HEARTBEAT NGẮT] Username: '${username}' bị kick do hết hạn`);
+    if (isNaN(expireTime) || currentTime >= expireTime) {
+        writeLog(`[HEARTBEAT NGẮT] Username: '${username}' bị ngắt do hết hạn (${user.expire_at})`);
         return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
     }
 
     if (user.allowed_ip && user.allowed_ip !== clientIp) {
-        writeLog(`[HEARTBEAT NGẮT] Username: '${username}' bị kick do sai IP (${clientIp})`);
-        return res.status(403).json({ valid: false, message: "Phát hiện IP không hợp lệ!" });
+        writeLog(`[HEARTBEAT NGẮT] Username: '${username}' bị ngắt do sai IP (${clientIp})`);
+        return res.status(403).json({ valid: false, message: "Phát hiện thay đổi IP bất thường!" });
     }
 
     return res.status(200).json({ valid: true, message: "Tài khoản hợp lệ." });
 });
 
-// TỰ ĐỘNG PING CHỐNG SLEEP (10 phút/lần)
-const SERVER_URL = 'https://sever-8wln.onrender.com/';
-setInterval(() => {
-    fetch(SERVER_URL)
-        .then(() => writeLog('[KEEP-ALIVE] Auto-ping thành công, duy trì server.'))
-        .catch(err => writeLog(`[KEEP-ALIVE LỖI] Auto-ping thất bại: ${err.message}`));
-}, 10 * 60 * 1000);
+// Xem nhật ký trực tiếp qua trình duyệt
+app.get('/logs', (req, res) => {
+    if (fs.existsSync(LOG_FILE)) {
+        res.sendFile(LOG_FILE);
+    } else {
+        res.send("Chưa có nhật ký hoạt động nào.");
+    }
+});
 
+// Route kiểm tra máy chủ
+app.get('/', (req, res) => {
+    res.send("Auth Server đang hoạt động bình thường!");
+});
+
+// Khởi chạy Máy chủ
 app.listen(PORT, () => {
-    writeLog(`Server khởi chạy thành công trên port ${PORT}`);
+    writeLog(`[SERVER START] Máy chủ Auth đang chạy trên cổng: ${PORT}`);
+
+    // Cơ chế Self-Ping giữ Server không bị ngủ đông trên Render
+    const SERVER_URL = "https://sever-8wln.onrender.com/";
+    setInterval(() => {
+        https.get(SERVER_URL, (res) => {
+            writeLog(`[KEEP-ALIVE] Auto-ping thành công. Status code: ${res.statusCode}`);
+        }).on('error', (err) => {
+            writeLog(`[KEEP-ALIVE LỖI] Auto-ping thất bại: ${err.message}`);
+        });
+    }, 10 * 60 * 1000); // Tự động gửi request mỗi 10 phút
 });
