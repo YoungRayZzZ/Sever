@@ -22,7 +22,7 @@ function writeLog(message) {
 // Cơ sở dữ liệu người dùng (Thay đổi thông tin tài khoản tại đây)
 const usersDB = {
     "admin": {
-        password: "2008",
+        password: "0001",
         expire_at: "2026-8-26T21:46:00+07:00", // Định dạng ISO-8601 chuẩn
         allowed_ip: ""
     },
