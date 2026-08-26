@@ -21,12 +21,12 @@ function writeLog(message) {
 
 const usersDB = {
     "user1": {
-        password: "123",
+        password: "1001",
         expire_at: "2026-12-31T23:59:59+07:00",
         allowed_ip: ""
     },
     "user2": {
-        password: "456",
+        password: "0002",
         expire_at: "2026-08-01T12:00:00+07:00",
         allowed_ip: ""
     }
