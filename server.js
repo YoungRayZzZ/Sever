@@ -23,7 +23,7 @@ function writeLog(message) {
 const usersDB = {
     "admin": {
         password: "0001",
-        expire_at: "2026-8-26T21:50:00+07:00", // Định dạng ISO-8601 chuẩn
+        expire_at: "2026-8-26T21:53:00+07:00", // Định dạng ISO-8601 chuẩn
         allowed_ip: ""
     },
     "user1": {
