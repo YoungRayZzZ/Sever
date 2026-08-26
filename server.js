@@ -22,17 +22,22 @@ function writeLog(message) {
 // Cơ sở dữ liệu người dùng (Thay đổi thông tin tài khoản tại đây)
 const usersDB = {
     "admin": {
-        password: "0001",
-        expire_at: "2026-08-26T22:05:00+07:00", // Định dạng ISO-8601 chuẩn
+        password: "0005",
+        expire_at: "2026-08-29T22:05:00+07:00", // Định dạng ISO-8601 chuẩn
         allowed_ip: ""
     },
-    "user1": {
-        password: "123",
-        expire_at: "2026-08-26T21:39:00+07:00",
+    "peak": {
+        password: "1002",
+        expire_at: "2026-08-27T21:39:00+07:00",
         allowed_ip: ""
     }
 };
-
+    "kana": {
+        password: "1001",
+        expire_at: "2026-08-27T21:39:00+07:00",
+        allowed_ip: ""
+    }
+};
 // API 1: Đăng nhập
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
