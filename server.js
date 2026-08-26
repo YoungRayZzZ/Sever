@@ -30,8 +30,7 @@ const usersDB = {
         password: "1002",
         expire_at: "2026-08-27T21:39:00+07:00",
         allowed_ip: ""
-    }
-};
+    },
     "kana": {
         password: "1001",
         expire_at: "2026-08-27T21:39:00+07:00",
