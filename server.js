@@ -6,10 +6,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Đường dẫn lưu file log
 const logFilePath = path.join(__dirname, 'server.log');
 
-// Hàm ghi log đồng thời ra Console và File
 function writeLog(message) {
     const vnTime = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
     const logMessage = `[${vnTime}] ${message}\n`;
@@ -21,7 +19,6 @@ function writeLog(message) {
     });
 }
 
-// Cơ sở dữ liệu danh sách tài khoản
 const usersDB = {
     "user1": {
         password: "123",
@@ -35,12 +32,10 @@ const usersDB = {
     }
 };
 
-// Route trang chủ
 app.get('/', (req, res) => {
     res.send("Server Auth Minecraft Client đang hoạt động!");
 });
 
-// Route xem file log trực tiếp (Mở https://sever-8wln.onrender.com/logs)
 app.get('/logs', (req, res) => {
     if (fs.existsSync(logFilePath)) {
         res.sendFile(logFilePath);
@@ -49,7 +44,7 @@ app.get('/logs', (req, res) => {
     }
 });
 
-// API Đăng nhập
+// API ĐĂNG NHẬP
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
     const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
@@ -69,7 +64,8 @@ app.post('/api/auth/login', (req, res) => {
     const currentTime = Date.now();
     const expireTime = new Date(user.expire_at).getTime();
 
-    if (currentTime > expireTime) {
+    // Chặn ngay lập tức tại bước đăng nhập nếu hết hạn
+    if (currentTime >= expireTime) {
         writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Đã hết hạn`);
         return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
     }
@@ -86,7 +82,7 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(200).json({ valid: true, message: "Đăng nhập thành công!" });
 });
 
-// API Kiểm tra trạng thái định kỳ (Heartbeat)
+// API KIỂM TRA ĐỊNH KỲ (HEARTBEAT)
 app.post('/api/auth/check-status', (req, res) => {
     const { username } = req.body;
     const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
@@ -100,7 +96,7 @@ app.post('/api/auth/check-status', (req, res) => {
     const currentTime = Date.now();
     const expireTime = new Date(user.expire_at).getTime();
 
-    if (currentTime > expireTime) {
+    if (currentTime >= expireTime) {
         writeLog(`[HEARTBEAT NGẮT] Username: '${username}' bị kick do hết hạn`);
         return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
     }
@@ -113,11 +109,11 @@ app.post('/api/auth/check-status', (req, res) => {
     return res.status(200).json({ valid: true, message: "Tài khoản hợp lệ." });
 });
 
-// TỰ ĐỘNG PING CHỐNG SLEEP (Mỗi 10 phút tự gửi request 1 lần)
+// TỰ ĐỘNG PING CHỐNG SLEEP (10 phút/lần)
 const SERVER_URL = 'https://sever-8wln.onrender.com/';
 setInterval(() => {
     fetch(SERVER_URL)
-        .then(() => writeLog('[KEEP-ALIVE] Auto-ping thành công, duy trì server hoạt động.'))
+        .then(() => writeLog('[KEEP-ALIVE] Auto-ping thành công, duy trì server.'))
         .catch(err => writeLog(`[KEEP-ALIVE LỖI] Auto-ping thất bại: ${err.message}`));
 }, 10 * 60 * 1000);
 
