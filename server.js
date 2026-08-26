@@ -6,24 +6,22 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Đường dẫn tới file log
+// Đường dẫn lưu file log
 const logFilePath = path.join(__dirname, 'server.log');
 
-// Hàm hỗ trợ ghi log ra cả Terminal lẫn File log
+// Hàm ghi log đồng thời ra Console và File
 function writeLog(message) {
     const vnTime = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
     const logMessage = `[${vnTime}] ${message}\n`;
 
-    // In ra Terminal Render
     console.log(logMessage.trim());
 
-    // Ghi nối tiếp vào file server.log
     fs.appendFile(logFilePath, logMessage, (err) => {
         if (err) console.error("Lỗi khi ghi file log:", err);
     });
 }
 
-// Danh sách tài khoản
+// Cơ sở dữ liệu danh sách tài khoản
 const usersDB = {
     "user1": {
         password: "123",
@@ -31,29 +29,27 @@ const usersDB = {
         allowed_ip: ""
     },
     "user2": {
-        password: "0002",
-        expire_at: "2026-08-026T9:10:00+07:00",
+        password: "456",
+        expire_at: "2026-08-01T12:00:00+07:00",
         allowed_ip: ""
     }
 };
 
-// Trang chủ + API tải file log trực tiếp trên trình duyệt
+// Route trang chủ
 app.get('/', (req, res) => {
     res.send("Server Auth Minecraft Client đang hoạt động!");
 });
 
-// API xem/tải file log (Mở https://sever-8wln.onrender.com/logs trên trình duyệt)
+// Route xem file log trực tiếp (Mở https://sever-8wln.onrender.com/logs)
 app.get('/logs', (req, res) => {
     if (fs.existsSync(logFilePath)) {
         res.sendFile(logFilePath);
     } else {
-        res.status(444).send("Chưa có dữ liệu log nào được tạo!");
+        res.status(404).send("Chưa có dữ liệu log!");
     }
 });
 
-// =========================================================================
-// 1. API ĐĂNG NHẬP BAN ĐẦU
-// =========================================================================
+// API Đăng nhập
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
     const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
@@ -61,7 +57,7 @@ app.post('/api/auth/login', (req, res) => {
     const user = usersDB[username];
 
     if (!user) {
-        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Tài khoản không tồn tại`);
+        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Không tồn tại`);
         return res.status(401).json({ valid: false, message: "Tài khoản không tồn tại!" });
     }
 
@@ -74,7 +70,7 @@ app.post('/api/auth/login', (req, res) => {
     const expireTime = new Date(user.expire_at).getTime();
 
     if (currentTime > expireTime) {
-        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Tài khoản đã hết hạn`);
+        writeLog(`[LOGIN THẤT BẠI] Username: '${username}' | IP: ${clientIp} | Lý do: Đã hết hạn`);
         return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
     }
 
@@ -90,9 +86,7 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(200).json({ valid: true, message: "Đăng nhập thành công!" });
 });
 
-// =========================================================================
-// 2. API KIỂM TRA TRẠNG THÁI ĐỊNH KỲ (HEARTBEAT)
-// =========================================================================
+// API Kiểm tra trạng thái định kỳ (Heartbeat)
 app.post('/api/auth/check-status', (req, res) => {
     const { username } = req.body;
     const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
@@ -107,7 +101,7 @@ app.post('/api/auth/check-status', (req, res) => {
     const expireTime = new Date(user.expire_at).getTime();
 
     if (currentTime > expireTime) {
-        writeLog(`[HEARTBEAT NGẮT] Username: '${username}' bị kick do vừa hết hạn`);
+        writeLog(`[HEARTBEAT NGẮT] Username: '${username}' bị kick do hết hạn`);
         return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
     }
 
@@ -118,6 +112,14 @@ app.post('/api/auth/check-status', (req, res) => {
 
     return res.status(200).json({ valid: true, message: "Tài khoản hợp lệ." });
 });
+
+// TỰ ĐỘNG PING CHỐNG SLEEP (Mỗi 10 phút tự gửi request 1 lần)
+const SERVER_URL = 'https://sever-8wln.onrender.com/';
+setInterval(() => {
+    fetch(SERVER_URL)
+        .then(() => writeLog('[KEEP-ALIVE] Auto-ping thành công, duy trì server hoạt động.'))
+        .catch(err => writeLog(`[KEEP-ALIVE LỖI] Auto-ping thất bại: ${err.message}`));
+}, 10 * 60 * 1000);
 
 app.listen(PORT, () => {
     writeLog(`Server khởi chạy thành công trên port ${PORT}`);
