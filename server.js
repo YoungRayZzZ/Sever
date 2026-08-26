@@ -31,8 +31,8 @@ const usersDB = {
         allowed_ip: ""
     },
     "user2": {
-        password: "456",
-        expire_at: "2026-08-01T12:00:00+07:00",
+        password: "0002",
+        expire_at: "2026-08-026T9:10:00+07:00",
         allowed_ip: ""
     }
 };
