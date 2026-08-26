@@ -1,53 +1,92 @@
 const express = require('express');
-const cors = require('cors');
-
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Cho phép tất cả các nguồn truy cập API từ xa
-app.use(cors());
 app.use(express.json());
 
-// Danh sách tài khoản người dùng
-// Lưu ý: Múi giờ chuẩn UTC (Giờ VN - 7 tiếng)
+// Hàm hỗ trợ lấy thời gian hiện tại theo định dạng chuẩn Việt Nam (YYYY-MM-DD HH:mm:ss)
+function getVNTime(dateInput = new Date()) {
+    return new Date(dateInput).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+}
+
+// Danh sách tài khoản (expire_at hỗ trợ cả định dạng UTC ISO hoặc chuỗi thời gian chuẩn)
 const usersDB = {
     "user1": {
-        password: "123",
-        expire_at: "2026-08-25T04:00:00.000Z" // Hết hạn lúc 21:43 ngày 25/08/2026 giờ VN
+        password: "0001",
+        expire_at: "2026-12-31T23:59:59+07:00", // Giờ Việt Nam (UTC+7)
+        allowed_ip: ""
     },
     "user2": {
-        password: "9123",
-        expire_at: "2026-08-26T17:00:00.000Z"
+        password: "0002",
+        expire_at: "2026-08-26T9:00:00+07:00", // Đã hết hạn
+        allowed_ip: ""
     }
 };
 
-// Route kiểm tra trạng thái Server
-app.get('/', (req, res) => {
-    res.send('Auth Server đang hoạt động!');
-});
-
-// API Đăng nhập
+// =========================================================================
+// 1. API ĐĂNG NHẬP BAN ĐẦU
+// =========================================================================
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+
     const user = usersDB[username];
 
-    // Kiểm tra tài khoản và mật khẩu
-    if (!user || user.password !== password) {
-        return res.status(401).json({ message: "Sai tài khoản hoặc mật khẩu!" });
+    if (!user) {
+        return res.status(401).json({ valid: false, message: "Tài khoản không tồn tại!" });
     }
 
-    // So sánh thời gian theo Timestamp (Mili-giây)
+    if (user.password !== password) {
+        return res.status(401).json({ valid: false, message: "Mật khẩu không chính xác!" });
+    }
+
+    // So sánh thời gian Epoch ms (chuẩn xác 100% không phụ thuộc mốc giờ của server Render)
     const currentTime = Date.now();
     const expireTime = new Date(user.expire_at).getTime();
 
     if (currentTime > expireTime) {
-        return res.status(403).json({ message: "Tài khoản của bạn đã hết hạn!" });
+        console.log(`[${getVNTime()}] Login thất bại: User '${username}' đã hết hạn.`);
+        return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
     }
 
-    return res.status(200).json({ message: "Đăng nhập thành công!" });
+    if (!user.allowed_ip) {
+        user.allowed_ip = clientIp;
+    } else if (user.allowed_ip !== clientIp) {
+        return res.status(403).json({ valid: false, message: "Tài khoản đang được sử dụng ở thiết bị/IP khác!" });
+    }
+
+    console.log(`[${getVNTime()}] User '${username}' đăng nhập thành công.`);
+    return res.status(200).json({ valid: true, message: "Đăng nhập thành công!" });
 });
 
-// Tự động nhận PORT từ Render cấp hoặc dùng 3000 ở máy local
-const PORT = process.env.PORT || 3000;
+// =========================================================================
+// 2. API KIỂM TRA TRẠNG THÁI ĐỊNH KỲ (HEARTBEAT)
+// =========================================================================
+app.post('/api/auth/check-status', (req, res) => {
+    const { username } = req.body;
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+
+    const user = usersDB[username];
+
+    if (!user) {
+        return res.status(401).json({ valid: false, message: "Tài khoản không tồn tại!" });
+    }
+
+    const currentTime = Date.now();
+    const expireTime = new Date(user.expire_at).getTime();
+
+    if (currentTime > expireTime) {
+        console.log(`[${getVNTime()}] Heartbeat: User '${username}' hết hạn -> Ngắt kết nối.`);
+        return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
+    }
+
+    if (user.allowed_ip && user.allowed_ip !== clientIp) {
+        return res.status(403).json({ valid: false, message: "Phát hiện IP không hợp lệ!" });
+    }
+
+    return res.status(200).json({ valid: true, message: "Tài khoản hợp lệ." });
+});
+
 app.listen(PORT, () => {
-    console.log(`Server đang chạy trên port ${PORT}`);
+    console.log(`[${getVNTime()}] Server đang chạy trên port ${PORT}`);
 });
