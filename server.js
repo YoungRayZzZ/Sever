@@ -2,7 +2,7 @@ const usersDB = {
     "admin": {
         password: "0005",
         expire_at: "2026-08-29T22:05:00+07:00",
-        allowed_ip: "" // Ban đầu để trống, ai đăng nhập đầu tiên sẽ tự động khóa chết IP vào đây vĩnh viễn
+        allowed_ip: "42.113.171.240" // Ban đầu để trống, ai đăng nhập đầu tiên sẽ tự động khóa chết IP vào đây vĩnh viễn
     },
     "peak": {
         password: "1002",
