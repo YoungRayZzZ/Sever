@@ -2,16 +2,32 @@ const usersDB = {
     "admin": {
         password: "0005",
         expire_at: "2026-08-29T22:05:00+07:00",
-        allowed_ip: "" // Ban đầu để trống, ai đăng nhập đầu tiên sẽ tự động khóa chết IP vào đây vĩnh viễn
+        allowed_ip: "42.113.171.240"
     },
     "peak": {
         password: "1002",
-        expire_at: "2026-08-27T21:39:00+07:00",
+        expire_at: "2026-08-28T21:39:00+07:00",
         allowed_ip: ""
     },
     "kana": {
         password: "1001",
-        expire_at: "2026-08-27T21:39:00+07:00",
+        expire_at: "2026-08-28T21:39:00+07:00",
+        allowed_ip: ""
+    },
+    // Thêm các tài khoản mới dưới đây:
+    "lumi": {
+        password: "1003", // Đổi mật khẩu tùy ý
+        expire_at: "2026-08-28T23:59:59+07:00", // Đặt thời gian hết hạn mong muốn
+        allowed_ip: "" // Để trống để tự động khóa IP của người đăng nhập đầu tiên
+    },
+    "noname": {
+        password: "1004",
+        expire_at: "2026-08-28T23:59:59+07:00",
+        allowed_ip: ""
+    },
+    "dyo": {
+        password: "1005",
+        expire_at: "2026-08-28T23:59:59+07:00",
         allowed_ip: ""
     }
 };
