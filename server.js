@@ -108,3 +108,15 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server đang chạy trên cổng ${PORT}`);
 });
+// Tự động ping server mỗi 10 phút (600,000 milliseconds) để tránh bị sleep trên Render
+const INTERVAL = 10 * 60 * 1000; 
+const SELF_URL = "https://sever-8wln.onrender.com"; // Thay bằng URL Render của bạn nếu cần
+
+setInterval(() => {
+    const https = require('https');
+    https.get(SELF_URL, (res) => {
+        writeLog(`[SELF-PING] Giữ server sống - Trạng thái: ${res.statusCode}`);
+    }).on('error', (err) => {
+        writeLog(`[SELF-PING LỖI] ${err.message}`);
+    });
+}, INTERVAL);
