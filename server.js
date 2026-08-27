@@ -11,7 +11,7 @@ function writeLog(message) {
 
 const usersDB = {
     "trap": {
-        password: "1234", // Bạn có thể thay đổi mật khẩu này tùy ý
+        password: "1234",
         expire_at: "2026-08-29T23:59:59+07:00",
         allowed_ip: ""
     },
@@ -66,7 +66,7 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(403).json({ valid: false, message: "Tài khoản của bạn đã hết hạn sử dụng!" });
     }
 
-    // --- CƠ CHẾ LINH HOẠT: TỰ ĐỘNG CẬP NHẬT NẾU ĐỔI IP ---
+    // Cơ chế IP
     if (!user.allowed_ip) {
         user.allowed_ip = clientIp;
         writeLog(`[KHÓA IP CỐ ĐỊNH] Username: '${username}' đã gắn chết với IP: ${clientIp}`);
@@ -77,6 +77,30 @@ app.post('/api/auth/login', (req, res) => {
 
     writeLog(`[LOGIN THÀNH CÔNG] Username: '${username}' | IP: ${clientIp}`);
     return res.status(200).json({ valid: true, message: "Đăng nhập thành công!" });
+});
+
+// API 2: Kiểm tra định kỳ trạng thái từ AuthChecker của Client (mỗi 15 giây)
+app.post('/api/auth/check-status', (req, res) => {
+    const username = (req.body.username || '').trim().toLowerCase();
+    const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    const clientIp = rawIp.split(',')[0].trim();
+
+    const user = usersDB[username];
+
+    // Nếu không tìm thấy user hoặc IP bị lệch/thay đổi bất thường so với lúc đăng nhập
+    if (!user || user.allowed_ip !== clientIp) {
+        return res.status(403).json({ valid: false, message: "IP không hợp lệ!" });
+    }
+
+    const currentTime = Date.now();
+    const expireTime = new Date(user.expire_at).getTime();
+
+    // Nếu thời gian hiện tại đã quá hạn
+    if (isNaN(expireTime) || currentTime >= expireTime) {
+        return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
+    }
+
+    return res.status(200).json({ valid: true, message: "Trạng thái hợp lệ" });
 });
 
 // Khởi động server
