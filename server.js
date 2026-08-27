@@ -43,7 +43,7 @@ const usersDB = {
     "peak":   { password: "1002",   expire_at: "2026-08-28T21:39:00+07:00", allowed_ip: "" },
     "lumi":   { password: "1003",   expire_at: "2026-08-28T23:59:59+07:00", allowed_ip: "" },
     "noname": { password: "10314",  expire_at: "2026-08-21T23:59:59+07:00", allowed_ip: "" },
-    "dyo":    { password: "1005",   expire_at: "2026-08-28T23:59:59+07:00", allowed_ip: "" }
+    "belanh":    { password: "2222",   expire_at: "2026-08-28T23:59:59+07:00", allowed_ip: "" }
 };
 
 // ====== ROUTES ======
