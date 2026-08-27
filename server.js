@@ -13,7 +13,7 @@ const usersDB = {
     "admin": {
         password: "0005",
         expire_at: "2026-08-29T22:05:00+07:00",
-        allowed_ip: "42.113.171.240"
+        allowed_ip: ""
     },
     "peak": {
         password: "1002",
