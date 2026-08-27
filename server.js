@@ -166,3 +166,54 @@ setInterval(() => {
         writeLog(`[KEEP-ALIVE LỖI] ${err.message}`);
     });
 }, INTERVAL);
+// --- BỔ SUNG TÍNH NĂNG NHẬN VÀ HIỂN THỊ CHAT/LỆNH ---
+
+// Mảng lưu lịch sử chat và lệnh (tối đa 200 dòng gần nhất)
+const chatHistory = [];
+
+// API nhận log chat/lệnh từ game gửi lên
+app.post('/api/chat/log', (req, res) => {
+    const { username, message } = req.body;
+    
+    if (!username || !message) {
+        return res.status(400).json({ success: false, message: "Thiếu thông tin!" });
+    }
+
+    const timeString = new Date().toLocaleString('vi-VN');
+    const logEntry = `[${timeString}] ${username}: ${message}`;
+    
+    // Lưu vào mảng
+    chatHistory.unshift(logEntry);
+    if (chatHistory.length > 200) {
+        chatHistory.pop();
+    }
+    
+    console.log(logEntry); // In ra console của Render để kiểm tra
+    return res.status(200).json({ success: true });
+});
+
+// Trang web xem lịch sử chat & lệnh tại: https://sever-8wln.onrender.com/chat-logs
+app.get('/chat-logs', (req, res) => {
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+            <meta charset="UTF-8">
+            <title>In-game Chat & Command Logs</title>
+            <meta http-equiv="refresh" content="3"> <!-- Tự động làm mới mỗi 3 giây -->
+            <style>
+                body { font-family: monospace; background-color: #1e1e1e; color: #d4d4d4; padding: 20px; }
+                h2 { color: #4ec9b0; }
+                pre { background-color: #252526; padding: 15px; border-radius: 5px; border: 1px solid #333; max-height: 80vh; overflow-y: auto; line-height: 1.5; font-size: 14px; }
+                .info { color: #9cdcfe; margin-bottom: 10px; }
+            </style>
+        </head>
+        <body>
+            <h2>Lịch sử Chat & Lệnh In-game (Real-time)</h2>
+            <div class="info">Hiển thị mọi tin nhắn và câu lệnh (/pv, /home...) người chơi thực hiện. Tự động cập nhật sau mỗi 3 giây.</div>
+            <pre>${chatHistory.length > 0 ? chatHistory.join('\n') : 'Chưa có hoạt động chat hoặc lệnh nào được ghi nhận.'}</pre>
+        </body>
+        </html>
+    `;
+    res.status(200).send(htmlContent);
+});
