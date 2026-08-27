@@ -1,3 +1,14 @@
+const express = require('express');
+const app = express();
+
+app.use(express.json());
+
+// Hàm ghi log đơn giản (nếu bạn đã có hàm writeLog riêng thì giữ lại hàm của bạn)
+function writeLog(message) {
+    const timeString = new Date().toLocaleString('vi-VN');
+    console.log(`[${timeString}] ${message}`);
+}
+
 const usersDB = {
     "admin": {
         password: "0005",
@@ -14,11 +25,10 @@ const usersDB = {
         expire_at: "2026-08-28T21:39:00+07:00",
         allowed_ip: ""
     },
-    // Thêm các tài khoản mới dưới đây:
     "lumi": {
-        password: "1003", // Đổi mật khẩu tùy ý
-        expire_at: "2026-08-28T23:59:59+07:00", // Đặt thời gian hết hạn mong muốn
-        allowed_ip: "" // Để trống để tự động khóa IP của người đăng nhập đầu tiên
+        password: "1003",
+        expire_at: "2026-08-28T23:59:59+07:00",
+        allowed_ip: ""
     },
     "noname": {
         password: "1004",
@@ -55,15 +65,19 @@ app.post('/api/auth/login', (req, res) => {
 
     // --- CƠ CHẾ KHÓA CỨNG IP VĨNH VIỄN CHO NGƯỜI ĐẦU TIÊN ---
     if (!user.allowed_ip) {
-        // Nếu chưa có IP nào được gán, khóa cứng IP của người đầu tiên vào đây
         user.allowed_ip = clientIp;
         writeLog(`[KHÓA IP CỐ ĐỊNH] Username: '${username}' đã gắn chết với IP: ${clientIp}`);
     } else if (user.allowed_ip !== clientIp) {
-        // Nếu đã có IP mà máy khác cố tình đăng nhập vào (dù tài khoản đang offline) -> TỪ CHỐI LUÔN
         writeLog(`[CHẶN TRUY CẬP] Username: '${username}' cố gắng đăng nhập từ IP lạ: ${clientIp} (IP chuẩn: ${user.allowed_ip})`);
         return res.status(403).json({ valid: false, message: "Tài khoản này đã bị khóa với thiết bị khác!" });
     }
 
     writeLog(`[LOGIN THÀNH CÔNG] Username: '${username}' | IP: ${clientIp}`);
     return res.status(200).json({ valid: true, message: "Đăng nhập thành công!" });
+});
+
+// Khởi động server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server đang chạy trên cổng ${PORT}`);
 });
