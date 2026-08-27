@@ -3,10 +3,23 @@ const app = express();
 
 app.use(express.json());
 
-// Hàm ghi log chuẩn thời gian
+// Mảng lưu trữ tối đa 100 dòng log gần nhất để xem trên web
+const logHistory = [];
+const MAX_LOGS = 100;
+
+// Hàm ghi log: vừa hiển thị console vừa lưu vào mảng
 function writeLog(message) {
     const timeString = new Date().toLocaleString('vi-VN');
-    console.log(`[${timeString}] ${message}`);
+    const logEntry = `[${timeString}] ${message}`;
+    
+    // In ra console như bình thường
+    console.log(logEntry);
+    
+    // Lưu vào mảng lịch sử log
+    logHistory.unshift(logEntry); // Đưa log mới lên đầu danh sách
+    if (logHistory.length > MAX_LOGS) {
+        logHistory.pop(); // Giới hạn số lượng log tránh tốn bộ nhớ
+    }
 }
 
 const usersDB = {
@@ -42,9 +55,36 @@ const usersDB = {
     }
 };
 
-// Route trang chủ để phục vụ việc tự động ping
+// Route trang chủ
 app.get('/', (req, res) => {
-    res.status(200).send("Auth Server is running!");
+    res.status(200).send("Auth Server is running! Truy cập /logs để xem lịch sử hoạt động.");
+});
+
+// Route mới: Xem log trực tiếp trên trình duyệt tại /logs
+app.get('/logs', (req, res) => {
+    // Trả về giao diện HTML đơn giản hiển thị danh sách log, có nút tải lại trang (F5)
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+            <meta charset="UTF-8">
+            <title>Server Logs</title>
+            <meta http-equiv="refresh" content="5"> <!-- Tự động tải lại trang sau mỗi 5 giây -->
+            <style>
+                body { font-family: monospace; background-color: #1e1e1e; color: #d4d4d4; padding: 20px; }
+                h2 { color: #4ec9b0; }
+                pre { background-color: #252526; padding: 15px; border-radius: 5px; border: 1px solid #333; max-height: 80vh; overflow-y: auto; }
+                .info { color: #9cdcfe; margin-bottom: 10px; }
+            </style>
+        </head>
+        <body>
+            <h2>Lịch sử hoạt động của Server (Real-time Logs)</h2>
+            <div class="info">Trang sẽ tự động làm mới sau mỗi 5 giây để cập nhật log mới nhất.</div>
+            <pre>${logHistory.length > 0 ? logHistory.join('\n') : 'Chưa có log nào được ghi nhận.'}</pre>
+        </body>
+        </html>
+    `;
+    res.status(200).send(htmlContent);
 });
 
 // API 1: Đăng nhập
@@ -52,7 +92,6 @@ app.post('/api/auth/login', (req, res) => {
     const username = (req.body.username || '').trim().toLowerCase();
     const password = (req.body.password || '').trim();
     
-    // Lấy chuẩn IP từ Proxy của Render hoặc Cloud
     const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
     const clientIp = rawIp.split(',')[0].trim();
 
@@ -71,7 +110,6 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(403).json({ valid: false, message: "Tài khoản của bạn đã hết hạn sử dụng!" });
     }
 
-    // Cơ chế kiểm tra và gán IP kèm log chi tiết
     if (!user.allowed_ip) {
         user.allowed_ip = clientIp;
         writeLog(`[GÁN IP MỚI] Username: '${username}' chưa có IP trước đó. Đã khóa cố định với IP: ${clientIp} (Hợp lệ)`);
