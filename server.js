@@ -3,7 +3,7 @@ const app = express();
 
 app.use(express.json());
 
-// Hàm ghi log đơn giản (nếu bạn đã có hàm writeLog riêng thì giữ lại hàm của bạn)
+// Hàm ghi log đơn giản
 function writeLog(message) {
     const timeString = new Date().toLocaleString('vi-VN');
     console.log(`[${timeString}] ${message}`);
@@ -46,7 +46,10 @@ const usersDB = {
 app.post('/api/auth/login', (req, res) => {
     const username = (req.body.username || '').trim().toLowerCase();
     const password = (req.body.password || '').trim();
-    const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+    
+    // Đã fix: Bắt chính xác IP chuẩn từ Header của Render/Proxy tránh bị lệch văng lỗi
+    const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    const clientIp = rawIp.split(',')[0].trim();
 
     const user = usersDB[username];
 
