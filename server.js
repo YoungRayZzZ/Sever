@@ -42,6 +42,11 @@ const usersDB = {
     }
 };
 
+// Route trang chủ để phục vụ việc tự động ping
+app.get('/', (req, res) => {
+    res.status(200).send("Auth Server is running!");
+});
+
 // API 1: Đăng nhập
 app.post('/api/auth/login', (req, res) => {
     const username = (req.body.username || '').trim().toLowerCase();
@@ -66,12 +71,14 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(403).json({ valid: false, message: "Tài khoản của bạn đã hết hạn sử dụng!" });
     }
 
-    // Cơ chế IP
+    // Cơ chế kiểm tra và gán IP kèm log chi tiết
     if (!user.allowed_ip) {
         user.allowed_ip = clientIp;
-        writeLog(`[KHÓA IP CỐ ĐỊNH] Username: '${username}' đã gắn chết với IP: ${clientIp}`);
-    } else if (user.allowed_ip !== clientIp) {
-        writeLog(`[CẬP NHẬT IP MỚI] Username: '${username}' đổi IP từ ${user.allowed_ip} sang ${clientIp}`);
+        writeLog(`[GÁN IP MỚI] Username: '${username}' chưa có IP trước đó. Đã khóa cố định với IP: ${clientIp} (Hợp lệ)`);
+    } else if (user.allowed_ip === clientIp) {
+        writeLog(`[KIỂM TRA IP] Username: '${username}' đăng nhập với IP hiện tại: ${clientIp} -> Trùng khớp, HỢP LỆ!`);
+    } else {
+        writeLog(`[CẬP NHẬT IP] Username: '${username}' đổi IP từ [${user.allowed_ip}] sang [${clientIp}] -> Chấp nhận IP mới`);
         user.allowed_ip = clientIp;
     }
 
@@ -79,7 +86,7 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(200).json({ valid: true, message: "Đăng nhập thành công!" });
 });
 
-// API 2: Kiểm tra định kỳ trạng thái từ AuthChecker của Client (mỗi 15 giây)
+// API 2: Kiểm tra định kỳ trạng thái từ AuthChecker của Client
 app.post('/api/auth/check-status', (req, res) => {
     const username = (req.body.username || '').trim().toLowerCase();
     const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
@@ -87,16 +94,16 @@ app.post('/api/auth/check-status', (req, res) => {
 
     const user = usersDB[username];
 
-    // Nếu không tìm thấy user hoặc IP bị lệch/thay đổi bất thường so với lúc đăng nhập
     if (!user || user.allowed_ip !== clientIp) {
+        writeLog(`[CHECK-STATUS TỪ CHỐI] Username: '${username}' | IP hiện tại (${clientIp}) không khớp với IP đã gán (${user ? user.allowed_ip : 'Không tồn tại'})`);
         return res.status(403).json({ valid: false, message: "IP không hợp lệ!" });
     }
 
     const currentTime = Date.now();
     const expireTime = new Date(user.expire_at).getTime();
 
-    // Nếu thời gian hiện tại đã quá hạn
     if (isNaN(expireTime) || currentTime >= expireTime) {
+        writeLog(`[CHECK-STATUS HẾT HẠN] Username: '${username}' đã hết hạn sử dụng.`);
         return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn!" });
     }
 
@@ -108,15 +115,16 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server đang chạy trên cổng ${PORT}`);
 });
-// Tự động ping server mỗi 10 phút (600,000 milliseconds) để tránh bị sleep trên Render
+
+// Tự động ping server mỗi 10 phút để tránh bị sleep trên Render
 const INTERVAL = 10 * 60 * 1000; 
-const SELF_URL = "https://sever-8wln.onrender.com"; // Thay bằng URL Render của bạn nếu cần
+const SELF_URL = "https://sever-8wln.onrender.com";
 
 setInterval(() => {
     const https = require('https');
     https.get(SELF_URL, (res) => {
-        writeLog(`[SELF-PING] Giữ server sống - Trạng thái: ${res.statusCode}`);
+        writeLog(`[KEEP-ALIVE] Auto-ping thành công. Status code: ${res.statusCode}`);
     }).on('error', (err) => {
-        writeLog(`[SELF-PING LỖI] ${err.message}`);
+        writeLog(`[KEEP-ALIVE LỖI] ${err.message}`);
     });
 }, INTERVAL);
