@@ -3,25 +3,25 @@ const app = express();
 
 app.use(express.json());
 
-// Hàm ghi log đơn giản
+// Hàm ghi log chuẩn thời gian
 function writeLog(message) {
     const timeString = new Date().toLocaleString('vi-VN');
     console.log(`[${timeString}] ${message}`);
 }
 
 const usersDB = {
-    "admin": {
-        password: "0005",
-        expire_at: "2026-08-29T22:05:00+07:00",
+    "trap": {
+        password: "1234", // Bạn có thể thay đổi mật khẩu này tùy ý
+        expire_at: "2026-08-29T23:59:59+07:00",
+        allowed_ip: ""
+    },
+    "thinh": {
+        password: "thinhh",
+        expire_at: "2026-08-28T21:39:00+07:00",
         allowed_ip: ""
     },
     "peak": {
         password: "1002",
-        expire_at: "2026-08-28T21:39:00+07:00",
-        allowed_ip: ""
-    },
-    "kana": {
-        password: "thinhh",
         expire_at: "2026-08-28T21:39:00+07:00",
         allowed_ip: ""
     },
@@ -47,7 +47,7 @@ app.post('/api/auth/login', (req, res) => {
     const username = (req.body.username || '').trim().toLowerCase();
     const password = (req.body.password || '').trim();
     
-    // Đã fix: Bắt chính xác IP chuẩn từ Header của Render/Proxy tránh bị lệch văng lỗi
+    // Lấy chuẩn IP từ Proxy của Render hoặc Cloud
     const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
     const clientIp = rawIp.split(',')[0].trim();
 
@@ -66,13 +66,13 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(403).json({ valid: false, message: "Tài khoản của bạn đã hết hạn sử dụng!" });
     }
 
-    // --- CƠ CHẾ KHÓA CỨNG IP VĨNH VIỄN CHO NGƯỜI ĐẦU TIÊN ---
+    // --- CƠ CHẾ LINH HOẠT: TỰ ĐỘNG CẬP NHẬT NẾU ĐỔI IP ---
     if (!user.allowed_ip) {
         user.allowed_ip = clientIp;
         writeLog(`[KHÓA IP CỐ ĐỊNH] Username: '${username}' đã gắn chết với IP: ${clientIp}`);
     } else if (user.allowed_ip !== clientIp) {
-        writeLog(`[CHẶN TRUY CẬP] Username: '${username}' cố gắng đăng nhập từ IP lạ: ${clientIp} (IP chuẩn: ${user.allowed_ip})`);
-        return res.status(403).json({ valid: false, message: "Tài khoản này đã bị khóa với thiết bị khác!" });
+        writeLog(`[CẬP NHẬT IP MỚI] Username: '${username}' đổi IP từ ${user.allowed_ip} sang ${clientIp}`);
+        user.allowed_ip = clientIp;
     }
 
     writeLog(`[LOGIN THÀNH CÔNG] Username: '${username}' | IP: ${clientIp}`);
