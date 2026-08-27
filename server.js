@@ -192,7 +192,7 @@ app.post('/api/chat/log', (req, res) => {
     return res.status(200).json({ success: true });
 });
 
-// Trang web xem lịch sử chat & lệnh tại: https://sever-8wln.onrender.com/chat-logs
+// Trang web xem lịch sử chat & lệnh tại: https://sever-8wln.onrender.com/chat/log
 app.get('/chat-logs', (req, res) => {
     const htmlContent = `
         <!DOCTYPE html>
