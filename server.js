@@ -148,3 +148,31 @@ app.listen(PORT, () => console.log(`Server đang chạy trên cổng ${PORT}`));
 setInterval(() => {
     require('https').get("https://sever-8wln.onrender.com", r => {}).on('error', ()=>{});
 }, 10*60*1000);
+app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body || {};
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || 'UNKNOWN';
+    
+    const user = usersDB[username];
+    if (!user || user.password !== password) {
+        return res.status(401).json({ valid: false, message: "Sai tài khoản hoặc mật khẩu" });
+    }
+
+    if (new Date(user.expire_at) < new Date()) {
+        return res.status(403).json({ valid: false, message: "Tài khoản đã hết hạn" });
+    }
+
+    // Kiểm tra khóa IP duy nhất
+    if (user.allowedIp && user.allowedIp !== clientIp) {
+        writeLog(`[IP-BLOCK] User "${username}" bị từ chối do khác IP (Đăng ký: ${user.allowedIp}, Thực tế: ${clientIp})`);
+        return res.status(403).json({ valid: false, message: "Tài khoản bị khóa với địa chỉ IP này!" });
+    }
+
+    // Nếu tài khoản chưa gán IP nào, tự động gán IP lần đầu tiên đăng nhập
+    if (!user.allowedIp) {
+        user.allowedIp = clientIp;
+        writeLog(`[IP-BIND] User "${username}" đã được gán cố định với IP: ${clientIp}`);
+    }
+
+    writeLog(`[LOGIN-SUCCESS] User: "${username}" thành công từ IP: ${clientIp}`);
+    return res.status(200).json({ valid: true });
+});
