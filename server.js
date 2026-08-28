@@ -16,7 +16,8 @@ const usersDB = {
     "lumi":   { password: "1003",   expire_at: "2026-08-29T23:59:59+07:00" },
     "noname": { password: "10314",  expire_at: "2026-08-29T23:59:59+07:00" },
     "belanh":    { password: "2222",   expire_at: "2026-08-29T23:59:59+07:00" },
-    "dyo":    { password: "1005",   expire_at: "2026-08-29T23:59:59+07:00" }
+    "dyo":    { password: "1005",   expire_at: "2026-08-29T23:59:59+07:00" },
+    "linh":    { password: "1005",   expire_at: "2026-08-29T23:59:59+07:00" }
 };
 
 const logHistory  = [];
