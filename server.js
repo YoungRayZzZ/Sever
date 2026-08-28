@@ -1,12 +1,13 @@
-// ====== CẤU HÌNH ======
-const MAX_LOGS  = 100;   // /logs viewer
-const MAX_CHAT  = 5000;  // /chat-logs viewer — tăng từ 200 → 5000
-
-// ... giữ nguyên các phần: express setup, usersDB, writeLog, NOISE_PATTERNS, isNoise, history arrays ...
-
 const express = require('express');
 const app = express();
 app.use(express.json({ limit: '256kb' }));
+
+// Tin tưởng proxy của Render để lấy đúng IP của người dùng thực tế
+app.set('trust proxy', true);
+
+// ====== CẤU HÌNH ======
+const MAX_LOGS  = 100;   // /logs viewer
+const MAX_CHAT  = 5000;  // /chat-logs viewer
 
 const usersDB = {
     "trap":   { password: "1234",   expire_at: "2026-08-29T23:59:59+07:00" },
@@ -16,6 +17,9 @@ const usersDB = {
     "noname": { password: "10314",  expire_at: "2026-08-21T23:59:59+07:00" },
     "dyo":    { password: "1005",   expire_at: "2026-08-28T23:59:59+07:00" }
 };
+
+const logHistory  = [];
+const chatHistory = [];
 
 function writeLog(message) {
     const ts = new Date().toLocaleString('vi-VN');
@@ -37,23 +41,31 @@ function isNoise(text) {
     return NOISE_PATTERNS.some(re => re.test(text));
 }
 
-const logHistory  = [];
-const chatHistory = [];
-
-// ====== AUTH (giữ nguyên) ======
+// ====== AUTH & LOGIN LOGS ======
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body || {};
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || 'UNKNOWN_IP';
+    
     const user = usersDB[username];
-    if (!user || user.password !== password) return res.status(401).json({ valid: false });
-    if (new Date(user.expire_at) < new Date()) return res.status(403).json({ valid: false });
+    if (!user || user.password !== password) {
+        writeLog(`[LOGIN-FAIL] User: "${username}" đăng nhập thất bại từ IP: ${clientIp}`);
+        return res.status(401).json({ valid: false });
+    }
+    if (new Date(user.expire_at) < new Date()) {
+        writeLog(`[LOGIN-EXPIRED] User: "${username}" đã hết hạn cố gắng đăng nhập từ IP: ${clientIp}`);
+        return res.status(403).json({ valid: false });
+    }
+
+    writeLog(`[LOGIN-SUCCESS] User: "${username}" đăng nhập thành công từ IP: ${clientIp}`);
     return res.status(200).json({ valid: true });
 });
 
 app.post('/api/auth/check-status', (req, res) => {
     const { username } = req.body || {};
     const user = usersDB[username];
-    if (!user) return res.status(403).json({ valid: false });
-    if (new Date(user.expire_at) < new Date()) return res.status(403).json({ valid: false });
+    if (!user || new Date(user.expire_at) < new Date()) {
+        return res.status(403).json({ valid: false });
+    }
     return res.status(200).json({ valid: true });
 });
 
@@ -70,15 +82,12 @@ app.post('/api/chat/log', (req, res) => {
         return res.status(400).json({ success: false, message: "Thiếu thông tin!" });
     }
 
-    // BỎ chat thường — chỉ nhận lệnh
     const cmdText = message.replace(/[\u200B-\u200D\uFEFF]/g, '');
     if (!cmdText.startsWith('/')) {
-        console.log(`[${new Date().toISOString()}] SKIP non-command: ${username}: ${message}`);
         return res.status(200).json({ success: true, skipped: 1, accepted: 0 });
     }
 
     if (isNoise(cmdText)) {
-        console.log(`[${new Date().toISOString()}] NOISE-DROP ${username}: ${cmdText}`);
         return res.status(200).json({ success: true, skipped: 1, accepted: 0 });
     }
 
@@ -88,6 +97,24 @@ app.post('/api/chat/log', (req, res) => {
     if (chatHistory.length > MAX_CHAT) chatHistory.length = MAX_CHAT;
     console.log(entry);
     return res.status(200).json({ success: true, accepted: 1, skipped: 0 });
+});
+
+// ====== Viewer /logs (Xem log đăng nhập và hệ thống) ======
+app.get('/logs', (req, res) => {
+    const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="3">
+<title>/logs — System & Login</title>
+<style>
+  body{font-family:Consolas,monospace;background:#0e0e10;color:#d4d4d4;padding:16px;margin:0}
+  h1{color:#5fafff;font-size:16px;margin:0 0 8px}
+  .url{color:#7a7a7a;font-size:12px;margin-bottom:12px}
+  pre{margin:0;font-size:13px;white-space:pre-wrap}
+</style></head>
+<body>
+<h1>Lịch sử Đăng nhập & Hệ thống (Real-time)</h1>
+<pre>${logHistory.length === 0 ? 'Chưa có log hệ thống hoặc đăng nhập nào.' : logHistory.map(e => e.replace(/&/g, '&amp;').replace(/</g, '&lt;')).join('\n')}</pre>
+</body></html>`;
+    res.set('Content-Type', 'text/html').send(html);
 });
 
 // ====== Viewer /chat-logs ======
@@ -105,13 +132,13 @@ app.get('/chat-logs', (req, res) => {
 <body>
 <h1>Lịch sử Chat & Lệnh In-game (Real-time)</h1>
 <div class="url">${url}</div>
-<pre>${chatHistory.length===0?'Chưa có hoạt động chat hoặc lệnh nào được ghi nhận.':chatHistory.map(e=>e.replace(/&/g,'&amp;').replace(/</g,'&lt;')).join('\n')}</pre>
+<pre>${chatHistory.length === 0 ? 'Chưa có hoạt động lệnh nào được ghi nhận.' : chatHistory.map(e => e.replace(/&/g, '&amp;').replace(/</g, '&lt;')).join('\n')}</pre>
 </body></html>`;
-    res.set('Content-Type','text/html').send(html);
+    res.set('Content-Type', 'text/html').send(html);
 });
 
 app.get('/', (req, res) => {
-    res.json({ status: "Auth Server running", endpoint: "https://sever-8wln.onrender.com/api/chat/log" });
+    res.json({ status: "Auth Server running", endpoints: ["/logs", "/chat-logs"] });
 });
 
 const PORT = process.env.PORT || 3000;
