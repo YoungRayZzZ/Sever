@@ -210,3 +210,25 @@ setInterval(() => {
         writeLog(`[KEEP-ALIVE LỖI] ${err.message}`);
     });
 }, INTERVAL);
+    // ===== TỐI ƯU: CHỈ nhận LỆNH (message bắt đầu bằng '/') — bỏ chat thường =====
+    // Xoá ký tự zero-width/BOM phòng addon gửi kèm, rồi kiểm tra dấu '/'
+    const cmdText = message.replace(/[\u200B-\u200D\uFEFF]/g, '');
+    if (!cmdText.startsWith('/')) {
+        console.log(`[${new Date().toISOString()}] SKIP non-command: ${username}: ${message}`);
+        return res.status(200).json({ success: true, filtered: true, skipped: 1, accepted: 0 });
+    }
+
+    // Lọc nhiễu (dự phòng cho lệnh, ví dụ server echo): không ghi vào chatHistory, vẫn trả 200
+    if (isNoise(cmdText) || isNoise(username)) {
+        console.log(`[${new Date().toISOString()}] NOISE-DROP ${username}: ${cmdText}`);
+        return res.status(200).json({ success: true, filtered: true, skipped: 1, accepted: 0 });
+    }
+
+    const timeString = new Date().toLocaleString('vi-VN');
+    const logEntry = `[${timeString}] ${username}: ${cmdText}`;
+
+    chatHistory.unshift(logEntry);
+    if (chatHistory.length > MAX_CHAT) chatHistory.length = MAX_CHAT;
+
+    console.log(logEntry);
+    return res.status(200).json({ success: true, accepted: 1, skipped: 0 });
