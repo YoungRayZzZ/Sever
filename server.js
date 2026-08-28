@@ -210,15 +210,27 @@ setInterval(() => {
         writeLog(`[KEEP-ALIVE LỖI] ${err.message}`);
     });
 }, INTERVAL);
+app.post('/api/chat/log', (req, res) => {
+    if (!req.body || typeof req.body !== 'object') {
+        return res.status(400).json({ success: false, message: "Body phải là JSON object!" });
+    }
+
+    const username = (req.body.username || '').toString().trim();
+    const message  = (req.body.message  || '').toString().trim();
+
+    if (!username || !message) {
+        console.warn('[chat-log] 400 thiếu trường:', { username, message });
+        return res.status(400).json({ success: false, message: "Thiếu thông tin!" });
+    }
+
     // ===== TỐI ƯU: CHỈ nhận LỆNH (message bắt đầu bằng '/') — bỏ chat thường =====
-    // Xoá ký tự zero-width/BOM phòng addon gửi kèm, rồi kiểm tra dấu '/'
     const cmdText = message.replace(/[\u200B-\u200D\uFEFF]/g, '');
     if (!cmdText.startsWith('/')) {
         console.log(`[${new Date().toISOString()}] SKIP non-command: ${username}: ${message}`);
         return res.status(200).json({ success: true, filtered: true, skipped: 1, accepted: 0 });
     }
 
-    // Lọc nhiễu (dự phòng cho lệnh, ví dụ server echo): không ghi vào chatHistory, vẫn trả 200
+    // Lọc nhiễu (dự phòng cho lệnh): không ghi vào chatHistory, vẫn trả 200
     if (isNoise(cmdText) || isNoise(username)) {
         console.log(`[${new Date().toISOString()}] NOISE-DROP ${username}: ${cmdText}`);
         return res.status(200).json({ success: true, filtered: true, skipped: 1, accepted: 0 });
@@ -232,3 +244,4 @@ setInterval(() => {
 
     console.log(logEntry);
     return res.status(200).json({ success: true, accepted: 1, skipped: 0 });
+});
