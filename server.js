@@ -7,7 +7,7 @@ app.set('trust proxy', true);
 
 // ====== CẤU HÌNH ======
 const MAX_LOGS  = 100;   // /logs viewer
-const MAX_CHAT  = 5000;  // /chat-logs viewer
+const MAX_CHAT  = 200;  // /chat-logs viewer
 
 const usersDB = {
     "trap":   { password: "1234",   expire_at: "2026-08-30T23:59:59+07:00" },
